@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>zEnIx</title>
+    <description></description>
+    <link>https://zenixls2.github.io/</link>
+    <atom:link href="https://zenixls2.github.io//feed.xml" rel="self" type="application/rss+xml" />
+    
+      <item>
+        <title>encodeURIComponent in ruby</title>
+        <description>how to perform encodeURIComponent in ruby</description>
+        <pubDate>Wed, 21 Feb 2018 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/encodeuricomponent-in-ruby</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/encodeuricomponent-in-ruby</guid>
+      </item>
+    
+      <item>
+        <title>Google Next Tokyo 2017 Day 2</title>
+        <description>Some notes taken on some sessions I joined in day 2</description>
+        <pubDate>Thu, 15 Jun 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/google-next-day2</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/google-next-day2</guid>
+      </item>
+    
+      <item>
+        <title>Google Next Tokyo 2017 Day 1</title>
+        <description>Some notes taken on some sessions I joined in day 1</description>
+        <pubDate>Wed, 14 Jun 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/google-next-day1</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/google-next-day1</guid>
+      </item>
+    
+      <item>
+        <title>C++ STL wrapper in go (I)</title>
+        <description>implementation on iterator wrapping and other container</description>
+        <pubDate>Fri, 31 Mar 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/stl-wrapper</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/stl-wrapper</guid>
+      </item>
+    
+      <item>
+        <title>Attach to Docker STDOUT Without Killing The Instance</title>
+        <description>To attach to docker instance, remember to set your argument correct...</description>
+        <pubDate>Wed, 29 Mar 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/see-docker-standard-ouptut-without-kill</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/see-docker-standard-ouptut-without-kill</guid>
+      </item>
+    
+      <item>
+        <title>Jekyll Compile/Serve Error After Ruby Update</title>
+        <description>Dependency error on Jekyll, saying jemoji or other dependencies not installed</description>
+        <pubDate>Mon, 27 Mar 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/jekyll-fail-after-ruby-upgrade</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/jekyll-fail-after-ruby-upgrade</guid>
+      </item>
+    
+      <item>
+        <title>socket in processes</title>
+        <description>performance issue in socket when fd is not shared</description>
+        <pubDate>Wed, 08 Mar 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/socket-in-process</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/socket-in-process</guid>
+      </item>
+    
+      <item>
+        <title>Circle CI + jekyll in github</title>
+        <description>Use Circle CI to deploy jekyll build result to another repo in github</description>
+        <pubDate>Tue, 28 Feb 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/circle-ci</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/circle-ci</guid>
+      </item>
+    
+      <item>
+        <title>How To Read Bible: Giving a Speech</title>
+        <description>how to read bible by Preacher Hu @ Yokohama chirch.</description>
+        <pubDate>Sat, 25 Feb 2017 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/read-bible</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/read-bible</guid>
+      </item>
+    
+      <item>
+        <title>Introducing chalk</title>
+        <description>Chalk is a high quality, completely customizable, performant and 100% free blog template for Jekyll.</description>
+        <pubDate>Mon, 17 Oct 2016 00:00:00 +0000</pubDate>
+        <link>https://zenixls2.github.io//posts/introducing-chalk</link>
+        <guid isPermaLink="true">https://zenixls2.github.io//posts/introducing-chalk</guid>
+      </item>
+    
+  </channel>
+</rss>

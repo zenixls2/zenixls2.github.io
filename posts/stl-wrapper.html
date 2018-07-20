@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>zEnIx | C++ STL wrapper in go (I)</title>
+  <meta name="description" content="implementation on iterator wrapping and other container">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta property="og:title" content="C++ STL wrapper in go (I)">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://zenixls2.github.io//posts/stl-wrapper">
+  <meta property="og:description" content="implementation on iterator wrapping and other container">
+  <meta property="og:site_name" content="zEnIx">
+  <meta property="og:image" content="https://zenixls2.github.io//assets/og-image.jpg">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:url" content="https://zenixls2.github.io//posts/stl-wrapper">
+  <meta name="twitter:title" content="C++ STL wrapper in go (I)">
+  <meta name="twitter:description" content="implementation on iterator wrapping and other container">
+  <meta name="twitter:image" content="https://zenixls2.github.io//assets/og-image.jpg">
+
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link href="https://zenixls2.github.io//feed.xml" type="application/rss+xml" rel="alternate" title="zEnIx Last 10 blog posts" />
+
+  
+    <link type="text/css" rel="stylesheet" href="/assets/light.css">
+  
+</head>
+
+<body>
+  <main role="main">
+    <div class="grid grid-centered">
+      <div class="grid-cell">
+        <nav class="header-nav reveal">
+  <a href="/" class="header-logo" title="zEnIx">zEnIx</a>
+  <ul class="header-links">
+    
+    
+      <li>
+        <a href="https://twitter.com/zenixls2" target="_blank" title="Twitter">
+          <span class="icon icon-social-twitter"></span>
+        </a>
+      </li>
+    
+    
+    
+      <li>
+        <a href="https://github.com/zenixls2" target="_blank" title="GitHub">
+          <span class="icon icon-social-github"></span>
+        </a>
+      </li>
+    
+    
+    
+    
+      <li>
+        <a href="https://www.linkedin.com/in/zenix-huang-a8493253" target="_blank" title="LinkedIn">
+          <span class="icon icon-social-linkedin"></span>
+        </a>
+      </li>
+    
+    
+    
+      <li>
+        <a href="mailto:zenixls2@gmail.com" title="Email">
+          <span class="icon icon-at"></span>
+        </a>
+      </li>
+    
+    
+      <li>
+        <a href="/feed.xml" target="_blank" title="RSS">
+          <span class="icon icon-social-rss"></span>
+        </a>
+      </li>
+    
+  </ul>
+</nav>
+
+        <article class="article reveal">
+          <header class="article-header">
+            <h1>C++ STL wrapper in go (I)</h1>
+            <p>implementation on iterator wrapping and other container</p>
+            <div class="article-list-footer">
+              <span class="article-list-date">
+                March 31, 2017
+              </span>
+              <span class="article-list-divider">-</span>
+              <span class="article-list-minutes">
+                
+                
+                  10 minute read
+                
+              </span>
+              <span class="article-list-divider">-</span>
+              <div class="article-list-tags">
+                
+                  <a href="/tag/note">note</a>
+                
+              </div>
+            </div>
+          </header>
+
+          <div class="article-content">
+            <p>Actually there are already some implementation based on SWIG that you can use directly, but the STL methods provided by SWIG does not contain any iterator operation. You may follow my <a href="https://github.com/zenixls2/stl">first project</a> to wrap by C in hand, or follow my <a href="https://github.com/zenixls2/stl2">second project</a> to create a new SWIG file to define those iterator methods. However, If you were only to pursue speed, you had better re-implement the key algorithm by yourself instead of calling cgo wrapped C/C++ implementations. The serialization/deserialization of Go parameter objects may take too much time for a function call either from C to Go or from Go to C.</p>
+
+<h2 id="look-into-c-wrapper">Look into C Wrapper</h2>
+<h4 id="the-cc-part">The C/C++ Part</h4>
+
+<p>The cgo compiler cannot call the C++ class methods directly. Instead, it requires you to create a C wrapper on top of it. Notice that currently we still have no smart solution to cope with templates (parametric polymorphism).</p>
+
+<div class="language-c++ highlighter-rouge"><pre class="highlight"><code><span class="c1">// here we chose to implement map&lt;int, object_ptr&gt;
+</span><span class="cp">#ifdef __cplusplus
+</span><span class="k">extern</span> <span class="s">"C"</span> <span class="p">{</span>
+<span class="cp">#endif </span><span class="cm">/* __cplusplus */</span><span class="cp">
+</span>  <span class="k">typedef</span> <span class="kt">void</span><span class="o">*</span> <span class="n">Map</span><span class="p">;</span>
+  <span class="k">typedef</span> <span class="kt">void</span><span class="o">*</span> <span class="n">MapIterator</span><span class="p">;</span>
+  <span class="n">Map</span> <span class="n">MapInit</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+  <span class="kt">void</span> <span class="n">MapAdd</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">,</span> <span class="kt">uintptr_t</span> <span class="n">value</span><span class="p">);</span>
+  <span class="kt">uintptr_t</span> <span class="n">MapGet</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">);</span>
+  <span class="n">MapIterator</span> <span class="n">MapLowerBound</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">);</span>
+  <span class="n">MapIterator</span> <span class="n">MapUpperBound</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">);</span>
+  <span class="kt">uintptr_t</span> <span class="n">MapIteratorGet</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">);</span>
+  <span class="kt">int</span> <span class="n">MapIteratorGetKey</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">);</span>
+  <span class="n">MapIterator</span> <span class="n">MapIteratorNext</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">);</span>
+  <span class="n">MapIterator</span> <span class="n">MapIteratorPrev</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">);</span>
+<span class="cp">#ifdef __cplusplus
+</span><span class="p">}</span>
+<span class="cp">#endif </span><span class="cm">/* __cplusplus */</span><span class="cp">
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<p>Next create files implement C wrapper functions:</p>
+
+<div class="language-c++ highlighter-rouge"><pre class="highlight"><code><span class="cp">#include &lt;map&gt;
+#include &lt;iterator&gt;
+#include &lt;utility&gt;
+#include &lt;iostream&gt;
+#include "map.h"
+</span>
+<span class="cp">#define MAP_TYPE std::map&lt;int, uintptr_t&gt;
+</span><span class="k">typedef</span> <span class="n">MAP_TYPE</span><span class="o">::</span><span class="n">iterator</span> <span class="n">iter_type</span><span class="p">;</span>
+
+<span class="n">Map</span> <span class="nf">MapInit</span><span class="p">()</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="n">Map</span><span class="p">)(</span><span class="k">new</span> <span class="n">MAP_TYPE</span><span class="p">());</span>
+<span class="p">}</span>
+
+<span class="kt">void</span> <span class="nf">MapFree</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span> <span class="kt">uintptr_t</span><span class="o">&gt;*</span> <span class="n">mptr</span> <span class="o">=</span>
+      <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MAP_TYPE</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">);</span>
+  <span class="k">delete</span> <span class="n">mptr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span> <span class="nf">MapAdd</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">,</span> <span class="kt">uintptr_t</span> <span class="n">value</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MAP_TYPE</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+    <span class="o">-&gt;</span><span class="n">insert</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_pair</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="c1">// map operator[]
+</span><span class="kt">uintptr_t</span> <span class="nf">MapGet</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MAP_TYPE</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">find</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
+      <span class="o">-&gt;</span><span class="n">second</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// self-defined data structure to hold iterators
+</span><span class="k">typedef</span> <span class="k">struct</span> <span class="n">_iterator</span> <span class="p">{</span>
+  <span class="n">iter_type</span> <span class="n">iter</span><span class="p">;</span> <span class="c1">// cursor iterator
+</span>  <span class="n">iter_type</span> <span class="n">begin</span><span class="p">;</span> <span class="c1">// holds the map begin() iterator
+</span>  <span class="n">iter_type</span> <span class="n">end</span><span class="p">;</span> <span class="c1">// holds the map end() iterator
+</span><span class="p">}</span> <span class="n">_iterator</span><span class="p">;</span>
+
+<span class="c1">// implement map::lower_bound
+</span><span class="n">MapIterator</span> <span class="nf">MapLowerBound</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">ret</span> <span class="o">=</span> <span class="k">new</span> <span class="n">_iterator</span><span class="p">();</span>
+  <span class="k">auto</span> <span class="n">container</span> <span class="o">=</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MAP_TYPE</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">);</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">lower_bound</span><span class="p">(</span><span class="n">key</span><span class="p">);</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">begin</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">();</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">end</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">();</span>
+  <span class="k">return</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MapIterator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// implement map::upper_bound
+</span><span class="n">MapIterator</span> <span class="nf">MapUpperBound</span><span class="p">(</span><span class="n">Map</span> <span class="n">m</span><span class="p">,</span> <span class="kt">int</span> <span class="n">key</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">ret</span> <span class="o">=</span> <span class="k">new</span> <span class="n">_iterator</span><span class="p">();</span>
+  <span class="k">auto</span> <span class="n">container</span> <span class="o">=</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MAP_TYPE</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">);</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">upper_bound</span><span class="p">(</span><span class="n">key</span><span class="p">);</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">begin</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">();</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">end</span> <span class="o">=</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">();</span>
+  <span class="k">return</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">MapIterator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// extract value from _iterator
+</span><span class="kt">uintptr_t</span> <span class="nf">MapIteratorGet</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">_iterator</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">iter</span><span class="p">))</span><span class="o">-&gt;</span><span class="n">iter</span><span class="o">-&gt;</span><span class="n">second</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// extract key from _iterator
+</span><span class="kt">int</span> <span class="nf">MapIteratorGetKey</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">_iterator</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">iter</span><span class="p">))</span><span class="o">-&gt;</span><span class="n">iter</span><span class="o">-&gt;</span><span class="n">first</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Iterate to the next position
+</span><span class="n">MapIterator</span> <span class="nf">MapIteratorNext</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">ret</span> <span class="o">=</span> <span class="p">(</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">_iterator</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">iter</span><span class="p">));</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span><span class="o">++</span><span class="p">;</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span> <span class="o">==</span> <span class="n">ret</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+  <span class="k">return</span> <span class="n">iter</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Iterate to the previous position
+</span><span class="n">MapIterator</span> <span class="nf">MapIteratorPrev</span><span class="p">(</span><span class="n">MapIterator</span> <span class="n">iter</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">ret</span> <span class="o">=</span> <span class="p">(</span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">_iterator</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">iter</span><span class="p">));</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span> <span class="o">==</span> <span class="n">ret</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+  <span class="n">ret</span><span class="o">-&gt;</span><span class="n">iter</span><span class="o">--</span><span class="p">;</span>
+  <span class="k">return</span> <span class="n">iter</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+<p><br /></p>
+
+<p>If you’re using Mac for development, maybe you would like to add some pragma when you try to wrap c++11/14/17 extensions:</p>
+
+<div class="language-c++ highlighter-rouge"><pre class="highlight"><code><span class="cp">#pragma clang diagnostic push
+#pragma clang diagnostic ignore "-Wc++11-extensions"
+</span>
+<span class="o">&lt;</span><span class="n">Code</span> <span class="n">Segments</span><span class="o">&gt;</span>
+
+<span class="cp">#pragma clang diagnostic pop
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<h4 id="the-golang-part">The Golang Part</h4>
+
+<p>In this part, we would define the golang wrapper for the C interface. All things are the same as wrapping other C API, you have to define the cgo flags, include the headers, and call the functions from C.</p>
+
+<div class="language-golang highlighter-rouge"><pre class="highlight"><code><span class="c">// +build cgo</span><span class="x">
+</span><span class="k">package</span><span class="x"> </span><span class="n">stl</span><span class="x">
+
+</span><span class="c">// we only define Mac related flags here. define yours based on your needs.</span><span class="x">
+</span><span class="c">// #cgo darwin LDFLAGS: -lstdc++ -L ./</span><span class="x">
+</span><span class="c">// #cgo darwin CFLAGS: -O2</span><span class="x">
+</span><span class="c">// #include &lt;stdint.h&gt;</span><span class="x">
+</span><span class="c">// #include "map.h"</span><span class="x">
+</span><span class="k">import</span><span class="x"> </span><span class="s">"C"</span><span class="x">  </span><span class="c">// no blank lines allowed between the declarations and import</span><span class="x">
+</span><span class="k">import</span><span class="x"> </span><span class="p">(</span><span class="x">
+  </span><span class="s">"reflect"</span><span class="x">
+</span><span class="p">)</span><span class="x">
+
+</span><span class="k">type</span><span class="x"> </span><span class="n">Map</span><span class="x"> </span><span class="k">struct</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">m</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">Map</span><span class="x"> </span><span class="c">// keep private</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// creates a new empty map</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="n">NewMap</span><span class="p">()</span><span class="x"> </span><span class="n">Map</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">var</span><span class="x"> </span><span class="n">ret</span><span class="x"> </span><span class="n">Map</span><span class="x">
+  </span><span class="n">ret</span><span class="o">.</span><span class="n">m</span><span class="x"> </span><span class="o">=</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapInit</span><span class="p">()</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="n">ret</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// Free release memory hold by map containers.</span><span class="x">
+</span><span class="c">// be sure to call this to prevent memory leak.</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">sm</span><span class="x"> </span><span class="n">Map</span><span class="p">)</span><span class="x"> </span><span class="n">Free</span><span class="p">()</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">C</span><span class="o">.</span><span class="n">MapFree</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">m</span><span class="p">)</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// Add key, value pair to map</span><span class="x">
+</span><span class="c">// We extract the memory address in golang as value in C.</span><span class="x">
+</span><span class="c">// Make sure your C code doesn't do direct access to golang memory,</span><span class="x">
+</span><span class="c">// notice that this a forbidden behavior in golang design if you do so.</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">sm</span><span class="x"> </span><span class="n">Map</span><span class="p">)</span><span class="x"> </span><span class="n">Add</span><span class="p">(</span><span class="n">key</span><span class="x"> </span><span class="kt">int</span><span class="p">,</span><span class="x"> </span><span class="n">value</span><span class="x"> </span><span class="k">interface</span><span class="p">{})</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">C</span><span class="o">.</span><span class="n">MapAdd</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">m</span><span class="p">,</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="kt">int</span><span class="p">(</span><span class="n">key</span><span class="p">),</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">uintptr_t</span><span class="p">(</span><span class="n">reflect</span><span class="o">.</span><span class="n">ValueOf</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">Pointer</span><span class="p">()))</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// Get value by key from map</span><span class="x">
+</span><span class="c">// Due to the limitation of Golang,</span><span class="x">
+</span><span class="c">// we are not able to do type casting based on the added type.</span><span class="x">
+</span><span class="c">// we have to do casting handy after address is got.</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">sm</span><span class="x"> </span><span class="n">Map</span><span class="p">)</span><span class="x"> </span><span class="n">Get</span><span class="p">(</span><span class="n">key</span><span class="x"> </span><span class="kt">int</span><span class="p">)</span><span class="x"> </span><span class="kt">uintptr</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="kt">uintptr</span><span class="p">(</span><span class="n">C</span><span class="o">.</span><span class="n">MapGet</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">m</span><span class="p">,</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="kt">int</span><span class="p">(</span><span class="n">key</span><span class="p">)))</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// Here we create a Iterator type to hold iterators we defined in C.</span><span class="x">
+</span><span class="c">// Would explain the implementation detail later in the paragraph.</span><span class="x">
+</span><span class="c">// returns an iterator to the first element not less than the given key.</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">sm</span><span class="x"> </span><span class="n">Map</span><span class="p">)</span><span class="x"> </span><span class="n">LowerBound</span><span class="p">(</span><span class="n">key</span><span class="x"> </span><span class="kt">int</span><span class="p">)</span><span class="x"> </span><span class="n">Iterator</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">iter</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">{}</span><span class="x">
+  </span><span class="n">iter</span><span class="o">.</span><span class="n">i</span><span class="x"> </span><span class="o">=</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapLowerBound</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">m</span><span class="p">,</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="kt">int</span><span class="p">(</span><span class="n">key</span><span class="p">))</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="n">iter</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// returns a iterator to the first element greater than the given key</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">sm</span><span class="x"> </span><span class="n">Map</span><span class="p">)</span><span class="x"> </span><span class="n">UpperBound</span><span class="p">(</span><span class="n">key</span><span class="x"> </span><span class="kt">int</span><span class="p">)</span><span class="x"> </span><span class="n">Iterator</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">iter</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">{}</span><span class="x">
+  </span><span class="n">iter</span><span class="o">.</span><span class="n">i</span><span class="x"> </span><span class="o">=</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapLowerBound</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">m</span><span class="p">,</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="kt">int</span><span class="p">(</span><span class="n">key</span><span class="p">))</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="n">iter</span><span class="x">
+</span><span class="p">}</span><span class="x">
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<p>As for Iterator, we first define a Interface for it:</p>
+
+<div class="language-golang highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="x"> </span><span class="n">Iterator</span><span class="x"> </span><span class="n">interaface</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">Value</span><span class="p">()</span><span class="x"> </span><span class="kt">uintptr</span><span class="x">
+  </span><span class="n">Key</span><span class="p">()</span><span class="x"> </span><span class="kt">int</span><span class="x">
+  </span><span class="n">Next</span><span class="p">()</span><span class="x"> </span><span class="n">Iterator</span><span class="x">
+  </span><span class="n">Prev</span><span class="p">()</span><span class="x"> </span><span class="n">Iterator</span><span class="x">
+</span><span class="p">}</span><span class="x">
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<p>And this should be reusable in other STL implementation.
+Now start to implement the iterator for map:</p>
+
+<div class="language-golang highlighter-rouge"><pre class="highlight"><code><span class="c">// +build cgo</span><span class="x">
+</span><span class="k">package</span><span class="x"> </span><span class="n">stl</span><span class="x">
+
+</span><span class="c">/// we only define Mac related flags here. define yours based on your needs.</span><span class="x">
+</span><span class="c">// #cgo darwin LDFLAGS: -lstdc++ -L ./</span><span class="x">
+</span><span class="c">// #cgo darwin CFLAGS: -O2</span><span class="x">
+</span><span class="c">// #include &lt;stdint.h&gt;</span><span class="x">
+</span><span class="c">// #include "map.h"</span><span class="x">
+</span><span class="k">import</span><span class="x"> </span><span class="s">"C"</span><span class="x">
+
+</span><span class="c">// struct that implements Iterator interface</span><span class="x">
+</span><span class="k">type</span><span class="x"> </span><span class="n">MapIterator</span><span class="x"> </span><span class="k">struct</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">i</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapIterator</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// get element pointer from iterator</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">si</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">)</span><span class="x"> </span><span class="n">Value</span><span class="p">()</span><span class="x"> </span><span class="kt">uintptr</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="kt">uintptr</span><span class="p">(</span><span class="n">C</span><span class="o">.</span><span class="n">MapIteratorGet</span><span class="p">(</span><span class="n">si</span><span class="o">.</span><span class="n">i</span><span class="p">))</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// get element key from iterator</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">si</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">)</span><span class="x"> </span><span class="n">Key</span><span class="p">()</span><span class="x"> </span><span class="kt">int</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="kt">int</span><span class="p">(</span><span class="n">C</span><span class="o">.</span><span class="n">MapIteratorGetKey</span><span class="p">(</span><span class="n">si</span><span class="o">.</span><span class="n">i</span><span class="p">))</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// iterator move to next</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">si</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">)</span><span class="x"> </span><span class="n">Next</span><span class="p">()</span><span class="x"> </span><span class="n">Iterator</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">if</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapIteratorNext</span><span class="p">(</span><span class="n">si</span><span class="o">.</span><span class="n">i</span><span class="p">)</span><span class="x"> </span><span class="o">==</span><span class="x"> </span><span class="no">nil</span><span class="x"> </span><span class="p">{</span><span class="x">
+    </span><span class="k">return</span><span class="x"> </span><span class="no">nil</span><span class="x">
+  </span><span class="p">}</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="n">si</span><span class="x">
+</span><span class="p">}</span><span class="x">
+
+</span><span class="c">// iterator move to prev</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="p">(</span><span class="n">si</span><span class="x"> </span><span class="n">MapIterator</span><span class="p">)</span><span class="x"> </span><span class="n">Prev</span><span class="p">()</span><span class="x"> </span><span class="n">Iterator</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="k">if</span><span class="x"> </span><span class="n">C</span><span class="o">.</span><span class="n">MapIteratorPrev</span><span class="p">(</span><span class="n">si</span><span class="o">.</span><span class="n">i</span><span class="p">)</span><span class="x"> </span><span class="o">==</span><span class="x"> </span><span class="no">nil</span><span class="x"> </span><span class="p">{</span><span class="x">
+    </span><span class="k">return</span><span class="x"> </span><span class="no">nil</span><span class="x">
+  </span><span class="p">}</span><span class="x">
+  </span><span class="k">return</span><span class="x"> </span><span class="n">si</span><span class="x">
+</span><span class="p">}</span><span class="x">
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<p>And that’s all!
+Let’s play with our newly created wrapper:</p>
+
+<div class="language-golang highlighter-rouge"><pre class="highlight"><code><span class="k">package</span><span class="x"> </span><span class="n">main</span><span class="x">
+</span><span class="k">import</span><span class="x"> </span><span class="p">(</span><span class="x">
+  </span><span class="s">"github.com/zenixls2/stl"</span><span class="x">
+  </span><span class="s">"fmt"</span><span class="x">
+</span><span class="p">)</span><span class="x">
+</span><span class="k">func</span><span class="x"> </span><span class="n">main</span><span class="p">()</span><span class="x"> </span><span class="p">{</span><span class="x">
+  </span><span class="n">m</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="n">stl</span><span class="o">.</span><span class="n">NewMap</span><span class="p">()</span><span class="x">
+  </span><span class="k">defer</span><span class="x"> </span><span class="n">m</span><span class="o">.</span><span class="n">Free</span><span class="p">()</span><span class="x">
+  </span><span class="n">a</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">"xdd"</span><span class="p">,</span><span class="x"> </span><span class="s">"123"</span><span class="p">,</span><span class="x"> </span><span class="s">"ohohoh"</span><span class="p">,</span><span class="x"> </span><span class="s">"abc"</span><span class="p">}</span><span class="x">
+  </span><span class="n">m</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="m">1</span><span class="p">,</span><span class="x"> </span><span class="o">&amp;</span><span class="n">a</span><span class="p">[</span><span class="m">0</span><span class="p">])</span><span class="x">
+  </span><span class="n">m</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="m">3</span><span class="p">,</span><span class="x"> </span><span class="o">&amp;</span><span class="n">a</span><span class="p">[</span><span class="m">1</span><span class="p">])</span><span class="x">
+  </span><span class="n">m</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="m">5</span><span class="p">,</span><span class="x"> </span><span class="o">&amp;</span><span class="n">a</span><span class="p">[</span><span class="m">2</span><span class="p">])</span><span class="x">
+  </span><span class="n">m</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="m">7</span><span class="p">,</span><span class="x"> </span><span class="o">&amp;</span><span class="n">a</span><span class="p">[</span><span class="m">3</span><span class="p">])</span><span class="x">
+
+  </span><span class="c">// should be "xdd"</span><span class="x">
+  </span><span class="n">fmt</span><span class="o">.</span><span class="n">Println</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="o">*</span><span class="kt">string</span><span class="p">)(</span><span class="n">unsafe</span><span class="o">.</span><span class="n">Pointer</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="m">1</span><span class="p">))))</span><span class="x">
+
+  </span><span class="c">// should output "ohohoh" and "abc"</span><span class="x">
+  </span><span class="n">iter</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="n">m</span><span class="o">.</span><span class="n">LowerBound</span><span class="p">(</span><span class="m">5</span><span class="p">)</span><span class="x">
+  </span><span class="k">for</span><span class="x"> </span><span class="n">end</span><span class="x"> </span><span class="o">:=</span><span class="x"> </span><span class="n">iter</span><span class="p">;</span><span class="x"> </span><span class="n">end</span><span class="x"> </span><span class="o">!=</span><span class="x"> </span><span class="no">nil</span><span class="p">;</span><span class="x"> </span><span class="n">end</span><span class="x"> </span><span class="o">=</span><span class="x"> </span><span class="n">iter</span><span class="o">.</span><span class="n">Next</span><span class="p">()</span><span class="x"> </span><span class="p">{</span><span class="x">
+    </span><span class="n">fmt</span><span class="o">.</span><span class="n">Println</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="o">*</span><span class="kt">string</span><span class="p">)(</span><span class="n">unsafe</span><span class="o">.</span><span class="n">Pointer</span><span class="p">(</span><span class="n">iter</span><span class="o">.</span><span class="n">Value</span><span class="p">())))</span><span class="x">
+  </span><span class="p">}</span><span class="x">
+</span><span class="p">}</span><span class="x">
+</span></code></pre>
+</div>
+<p><br /></p>
+
+<p>Just make sure if you are using Xcode 8.3, compile with <code class="highlighter-rouge">go build -ldflags -s xxx.go</code> to avoid this bug: <a href="https://github.com/golang/go/issues/19734">issue 19734</a></p>
+
+<p>There should be a backport in the future after 1.8.1 released.</p>
+
+          </div>
+          <div class="article-header">
+            <h4>Related posts</h4>
+            <ul>
+            
+              <li><p><a href="/posts/encodeuricomponent-in-ruby">encodeURIComponent in ruby</a></p></li>
+            
+              <li><p><a href="/posts/google-next-day2">Google Next Tokyo 2017 Day 2</a></p></li>
+            
+              <li><p><a href="/posts/google-next-day1">Google Next Tokyo 2017 Day 1</a></p></li>
+            
+            </ul>
+          </div>
+
+          <div class="article-share">
+            
+            <a href="" title="Share on Twitter" onclick="window.open('https://twitter.com/home?status=C++ STL wrapper in go (I) - https://zenixls2.github.io//posts/stl-wrapper by @zenixls2', 'newwindow', 'width=500, height=225'); return false;" data-turbolinks="false">
+              <svg enable-background="new 0 0 128 128" width="15px" version="1.1" viewBox="0 0 128 128" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="_x37__stroke"><g id="Twitter"><rect clip-rule="evenodd" fill="none" fill-rule="evenodd" height="128" width="128"/><path clip-rule="evenodd" d="M128,23.294    c-4.703,2.142-9.767,3.59-15.079,4.237c5.424-3.328,9.587-8.606,11.548-14.892c-5.079,3.082-10.691,5.324-16.687,6.526    c-4.778-5.231-11.608-8.498-19.166-8.498c-14.493,0-26.251,12.057-26.251,26.927c0,2.111,0.225,4.16,0.676,6.133    C41.217,42.601,21.871,31.892,8.91,15.582c-2.261,3.991-3.554,8.621-3.554,13.552c0,9.338,4.636,17.581,11.683,22.412    c-4.297-0.131-8.355-1.356-11.901-3.359v0.331c0,13.051,9.053,23.937,21.074,26.403c-2.201,0.632-4.523,0.948-6.92,0.948    c-1.69,0-3.343-0.162-4.944-0.478c3.343,10.694,13.035,18.483,24.53,18.691c-8.986,7.227-20.315,11.533-32.614,11.533    c-2.119,0-4.215-0.123-6.266-0.37c11.623,7.627,25.432,12.088,40.255,12.088c48.309,0,74.717-41.026,74.717-76.612    c0-1.171-0.023-2.342-0.068-3.49C120.036,33.433,124.491,28.695,128,23.294" fill-rule="evenodd" id="Twitter_1_"/></g></g></svg>
+            </a>
+            <a href="" title="Share on Facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u=https://zenixls2.github.io//posts/stl-wrapper', 'newwindow', 'width=500, height=500'); return false;" data-turbolinks="false">
+              <svg enable-background="new 0 0 128 128" width="15px" version="1.1" viewBox="0 0 128 128" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="_x31__stroke"><g id="Facebook_1_"><rect fill="none" height="128" width="128"/><path clip-rule="evenodd" d="M68.369,128H7.065C3.162,128,0,124.836,0,120.935    V7.065C0,3.162,3.162,0,7.065,0h113.871C124.837,0,128,3.162,128,7.065v113.87c0,3.902-3.163,7.065-7.064,7.065H88.318V78.431    h16.638l2.491-19.318H88.318V46.78c0-5.593,1.553-9.404,9.573-9.404l10.229-0.004V20.094c-1.769-0.235-7.841-0.761-14.906-0.761    c-14.749,0-24.846,9.003-24.846,25.535v14.246H51.688v19.318h16.681V128z" fill-rule="evenodd" id="Facebook"/></g></g></svg>
+            </a>
+            <a href="" title="Share on Google+" onclick="window.open('https://plus.google.com/share?url=https://zenixls2.github.io//posts/stl-wrapper', 'newwindow', 'width=550, height=400'); return false;" data-turbolinks="false">
+              <svg enable-background="new 0 0 128 128" version="1.1" viewBox="0 0 128 128" width="20px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="_x35__stroke"><g id="Google_Plus"><rect clip-rule="evenodd" fill="none" fill-rule="evenodd" height="128" width="128"/><path clip-rule="evenodd" d="M40.654,55.935v16.13    c0,0,15.619-0.021,21.979-0.021C59.189,82.5,53.834,88.194,40.654,88.194c-13.338,0-23.748-10.832-23.748-24.194    s10.41-24.194,23.748-24.194c7.052,0,11.607,2.483,15.784,5.944c3.344-3.35,3.065-3.828,11.573-11.877    c-7.222-6.586-16.822-10.6-27.357-10.6C18.201,23.273,0,41.507,0,64c0,22.493,18.201,40.727,40.654,40.727    c33.561,0,41.763-29.275,39.044-48.792H40.654z M113.912,56.742V42.628h-10.063v14.113H89.358v10.081h14.491v14.517h10.063V66.823    H128V56.742H113.912z" fill-rule="evenodd" id="Google_Plus_1_"/></g></g></svg>
+            </a>
+          </div>
+
+          
+            <div id="disqus_thread" class="article-comments"></div>
+            <script>
+              (function() {
+                  var d = document, s = d.createElement('script');
+                  s.src = '//zenixls2-github-io.disqus.com/embed.js';
+                  s.setAttribute('data-timestamp', +new Date());
+                  (d.head || d.body).appendChild(s);
+              })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+          
+        </article>
+        <footer class="footer reveal">
+  <p>
+  <span>
+    There are countless ingredients that make up the human body and mind,
+  </span>
+  <span>
+    like all the components that make up me as an individual with my own personality.
+  </span>
+  <span>
+    Sure, I have a face and voice to distinguish myself from others,
+  </span>
+  <span>
+    but my thoughts and memories are unique only to me, 
+  </span>
+  <span>
+    and I carry a sense of my own destiny.
+  </span>
+  <span>Each of those things are just a small part of it.</span>
+  <span>I collect information to use in my own way.</span>
+  <span>All of that blends to create a mixture that forms me and gives rise to my conscience.</span>
+  </p>
+  <b> - Ghost In The Shell - </b>
+  <br>
+  <p style="display:inline">
+  <a href="/about" title="About me">About Zenix Huang</a>    <div class="sep">|</div>
+  SiteMap
+  <div class="sep">|</div>
+  Copy Right
+  </p>
+</footer>
+
+      </div>
+    </div>
+  </main>
+  <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.16/webfont.js"></script>
+<link href="https://fonts.googleapis.com/earlyaccess/hannari.css" rel="stylesheet" />
+<script>
+  WebFont.load({
+    google: {
+      families: ['Cormorant Garamond:700', 'Lato:300,400,700']
+    }
+  });
+</script>
+
+
+  <script>
+    window.ga=function(){ga.q.push(arguments)};ga.q=[];ga.l=+new Date;
+    ga('create','UA-92954732-1','auto');ga('send','pageview')
+  </script>
+  <script src="https://www.google-analytics.com/analytics.js" async defer></script>
+
+
+<script type="text/javascript" src="/assets/vendor.js"></script>
+<script type="text/javascript" src="/assets/application.js"></script>
+
+</body>
+</html>
